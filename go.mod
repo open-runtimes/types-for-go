@@ -1,1 +1,1 @@
-module github.com/open-runtimes/types-for-go
+module github.com/open-runtimes/types-for-go/v3
