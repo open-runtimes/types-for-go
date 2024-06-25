@@ -16,9 +16,9 @@ const LOGGER_TYPE_LOG = "log"
 const LOGGER_TYPE_ERROR = "error"
 
 type Context struct {
-	_Logger Logger
-	Req     Request
-	Res     Response
+	Logger Logger
+	Req    Request
+	Res    Response
 }
 
 type Log struct {
@@ -30,11 +30,11 @@ func (l Log) String() string {
 }
 
 func (c *Context) Log(message interface{}) {
-	c._Logger.Write(message, LOGGER_TYPE_LOG, false)
+	c.Logger.Write(message, LOGGER_TYPE_LOG, false)
 }
 
 func (c *Context) Error(message interface{}) {
-	c._Logger.Write(message, LOGGER_TYPE_LOG, false)
+	c.Logger.Write(message, LOGGER_TYPE_LOG, false)
 }
 
 type Request struct {
