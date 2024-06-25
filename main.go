@@ -1,15 +1,24 @@
 package types
 
 import (
+	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
+	"log"
+	"math/rand"
+	"os"
+	"time"
 )
 
+const LOGGER_TYPE_LOG = "log"
+const LOGGER_TYPE_ERROR = "error"
+
 type Context struct {
-	Req    Request
-	Res    Response
-	Logs   []string
-	Errors []string
+	_Logger Logger
+	Req     Request
+	Res     Response
 }
 
 type Log struct {
@@ -21,43 +30,11 @@ func (l Log) String() string {
 }
 
 func (c *Context) Log(message interface{}) {
-	switch message.(type) {
-	case string:
-		c.Logs = append(c.Logs, message.(string))
-	case Log:
-		log := message.(Log)
-		c.Logs = append(c.Logs, log.String())
-	default:
-		jsonData, err := json.Marshal(message)
-		if err != nil {
-			logString := fmt.Sprintf("%v", message)
-			c.Logs = append(c.Logs, logString)
-			return
-		}
-
-		jsonString := string(jsonData)
-		c.Logs = append(c.Logs, jsonString)
-	}
+	c._Logger.Write(message, LOGGER_TYPE_LOG, false)
 }
 
 func (c *Context) Error(message interface{}) {
-	switch message.(type) {
-	case string:
-		c.Errors = append(c.Errors, message.(string))
-	case Log:
-		log := message.(Log)
-		c.Errors = append(c.Errors, log.String())
-	default:
-		jsonData, err := json.Marshal(message)
-		if err != nil {
-			logString := fmt.Sprintf("%v", message)
-			c.Errors = append(c.Errors, logString)
-			return
-		}
-
-		jsonString := string(jsonData)
-		c.Errors = append(c.Errors, jsonString)
-	}
+	c._Logger.Write(message, LOGGER_TYPE_LOG, false)
 }
 
 type Request struct {
@@ -135,4 +112,172 @@ func (r Response) Redirect(url string, statusCode int, headers map[string]string
 	headers["location"] = url
 
 	return r.Send("", statusCode, headers)
+}
+
+type Logger struct {
+	Enabled            bool
+	Id                 string
+	IncludesNativeInfo bool
+
+	StreamLogs   *os.File
+	StreamErrors *os.File
+
+	NativeStreamLogs   chan string
+	NativeStreamErrors chan string
+
+	WriterLogs   *os.File
+	WriterErrors *os.File
+
+	NativeLogsCache   *os.File
+	NativeErrorsCache *os.File
+}
+
+func NewLogger(status string, id string) (Logger, error) {
+	logger := Logger{
+		IncludesNativeInfo: false,
+	}
+
+	if status == "" || status == "enabled" {
+		logger.Enabled = true
+	} else {
+		logger.Enabled = false
+	}
+
+	if logger.Enabled {
+		serverEnv := os.Getenv("OPEN_RUNTIMES_ENV")
+
+		if serverEnv == "development" {
+			logger.Id = "dev"
+		} else {
+			if id == "" {
+				logger.Id = logger._GenerateId()
+			} else {
+				logger.Id = id
+			}
+		}
+
+		fileLogs, err := os.OpenFile("/mnt/logs/"+logger.Id+"_logs.log", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
+		if err != nil {
+			return Logger{}, errors.New("could not prepare log file")
+		}
+		logger.StreamLogs = fileLogs
+
+		fileErrors, err := os.OpenFile("/mnt/logs/"+logger.Id+"_errors.log", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
+		if err != nil {
+			return Logger{}, errors.New("could not prepare log file")
+		}
+		logger.StreamErrors = fileErrors
+	}
+
+	return logger, nil
+}
+
+func (l Logger) Write(message interface{}, xtype string, xnative bool) {
+	if xnative && !l.IncludesNativeInfo {
+		l.IncludesNativeInfo = true
+		l.Write("Native logs detected. Use context.Log() or context.Error() for better experience.", xtype, xnative)
+	}
+
+	stream := l.StreamLogs
+
+	if xtype == LOGGER_TYPE_ERROR {
+		stream = l.StreamErrors
+	}
+
+	stringLog := ""
+
+	switch message.(type) {
+	case string:
+		stringLog = message.(string)
+	case Log:
+		log := message.(Log)
+		stringLog = log.String()
+	default:
+		jsonData, err := json.Marshal(message)
+		if err != nil {
+			stringLog = fmt.Sprintf("%v", message)
+		} else {
+			jsonString := string(jsonData)
+			stringLog = jsonString
+		}
+	}
+
+	stream.Write([]byte(stringLog))
+}
+
+func (l Logger) End() {
+	if !l.Enabled {
+		return
+	}
+
+	l.Enabled = false
+
+	l.StreamLogs.Close()
+	l.StreamErrors.Close()
+}
+
+func (l Logger) OverrideNativeLogs() error {
+	l.NativeLogsCache = os.Stdout
+	l.NativeErrorsCache = os.Stderr
+
+	readerLogs, writerLogs, errLogs := os.Pipe()
+	if errLogs != nil {
+		return errors.New("could not prepare log capturing")
+	}
+	l.WriterLogs = writerLogs
+
+	readerErrors, writerErrors, errErrors := os.Pipe()
+	if errErrors != nil {
+		return errors.New("could not prepare log capturing")
+	}
+	l.WriterErrors = writerErrors
+
+	os.Stdout = writerLogs
+	os.Stderr = writerErrors
+
+	log.SetOutput(writerLogs)
+
+	l.NativeStreamLogs = make(chan string)
+	go func() {
+		var buf bytes.Buffer
+		io.Copy(&buf, readerLogs)
+		l.NativeStreamLogs <- buf.String()
+	}()
+
+	l.NativeStreamErrors = make(chan string)
+	go func() {
+		var buf bytes.Buffer
+		io.Copy(&buf, readerErrors)
+		l.NativeStreamErrors <- buf.String()
+	}()
+
+	return nil
+}
+
+func (l Logger) RevertNativeLogs() {
+	l.WriterLogs.Close()
+	l.WriterErrors.Close()
+
+	os.Stdout = l.NativeLogsCache
+	os.Stderr = l.NativeErrorsCache
+	log.SetOutput(os.Stderr)
+
+	customLogs := <-l.NativeStreamLogs
+	if customLogs != "" {
+		l.Write(customLogs, LOGGER_TYPE_LOG, true)
+	}
+
+	customErrors := <-l.NativeStreamErrors
+	if customErrors != "" {
+		l.Write(customLogs, LOGGER_TYPE_ERROR, true)
+	}
+}
+
+func (l Logger) _GenerateId() string {
+	timestamp := time.Now().UnixNano()
+	randomNumber := rand.Intn(1000)
+
+	// TODO: Improve logic, add padding
+	uniqueID := fmt.Sprintf("%d%d", timestamp, randomNumber)
+	return uniqueID
 }
