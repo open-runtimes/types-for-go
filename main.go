@@ -229,13 +229,13 @@ func NewLogger(status string, id string) (Logger, error) {
 			}
 		}
 
-		fileLogs, err := os.OpenFile("/mnt/logs/"+logger.Id+"_logs.log", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
+		fileLogs, err := os.OpenFile("/mnt/logs/"+logger.Id+"_logs.log", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
 		if err != nil {
 			return Logger{}, errors.New("could not prepare log file")
 		}
 		logger.StreamLogs = fileLogs
 
-		fileErrors, err := os.OpenFile("/mnt/logs/"+logger.Id+"_errors.log", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
+		fileErrors, err := os.OpenFile("/mnt/logs/"+logger.Id+"_errors.log", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
 		if err != nil {
 			return Logger{}, errors.New("could not prepare log file")
 		}
