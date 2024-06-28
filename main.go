@@ -51,6 +51,10 @@ type Request struct {
 	Query       map[string]string
 }
 
+func (r *Request) SetBodyBinary(bytes []byte) {
+	r.bodyBinary = bytes
+}
+
 func (r Request) BodyBinary() []byte {
 	return r.bodyBinary
 }
@@ -274,7 +278,7 @@ func (l Logger) Write(message interface{}, xtype string, xnative bool) {
 	stream.Write([]byte(stringLog))
 }
 
-func (l Logger) End() {
+func (l *Logger) End() {
 	if !l.Enabled {
 		return
 	}
