@@ -39,7 +39,7 @@ func (c *Context) Error(message interface{}) {
 }
 
 type Request struct {
-	_BodyBinary []byte
+	bodyBinary  []byte
 	Headers     map[string]string
 	Method      string
 	Url         string
@@ -52,7 +52,7 @@ type Request struct {
 }
 
 func (r Request) BodyBinary() []byte {
-	return r._BodyBinary
+	return r.bodyBinary
 }
 
 func (r Request) BodyText() string {
