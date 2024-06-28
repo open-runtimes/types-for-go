@@ -35,7 +35,7 @@ func (c *Context) Log(message interface{}) {
 }
 
 func (c *Context) Error(message interface{}) {
-	c.Logger.Write(message, LOGGER_TYPE_LOG, false)
+	c.Logger.Write(message, LOGGER_TYPE_ERROR, false)
 }
 
 type Request struct {
