@@ -221,14 +221,14 @@ func NewLogger(status string, id string) (Logger, error) {
 	if logger.Enabled {
 		serverEnv := os.Getenv("OPEN_RUNTIMES_ENV")
 
-		if serverEnv == "development" {
-			logger.Id = "dev"
-		} else {
-			if id == "" {
-				logger.Id = logger.generateId(7)
+		if id == "" {
+			if serverEnv == "development" {
+				logger.Id = "dev"
 			} else {
-				logger.Id = id
+				logger.Id = logger.generateId(7)
 			}
+		} else {
+			logger.Id = id
 		}
 
 		fileLogs, err := os.OpenFile("/mnt/logs/"+logger.Id+"_logs.log", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
