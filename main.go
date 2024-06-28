@@ -75,7 +75,7 @@ func (r Request) BodyJson() (map[string]interface{}, error) {
 		err := json.Unmarshal(bodyBinary, &body)
 
 		if err != nil {
-			return map[string]interface{}{}, errors.New("Could not parse body into a JSON.")
+			return map[string]interface{}{}, errors.New("could not parse body into a JSON")
 		}
 
 		return body, nil
