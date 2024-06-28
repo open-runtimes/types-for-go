@@ -254,7 +254,7 @@ func NewLogger(status string, id string) (Logger, error) {
 	return logger, nil
 }
 
-func (l Logger) Write(message interface{}, xtype string, xnative bool) {
+func (l *Logger) Write(message interface{}, xtype string, xnative bool) {
 	if xnative && !l.IncludesNativeInfo {
 		l.IncludesNativeInfo = true
 		l.Write("Native logs detected. Use context.Log() or context.Error() for better experience.", xtype, xnative)
@@ -298,7 +298,7 @@ func (l *Logger) End() {
 	l.StreamErrors.Close()
 }
 
-func (l Logger) OverrideNativeLogs() error {
+func (l *Logger) OverrideNativeLogs() error {
 	l.NativeLogsCache = os.Stdout
 	l.NativeErrorsCache = os.Stderr
 
@@ -317,7 +317,7 @@ func (l Logger) OverrideNativeLogs() error {
 	os.Stdout = writerLogs
 	os.Stderr = writerErrors
 
-	log.SetOutput(writerLogs)
+	log.SetOutput(writerErrors)
 
 	l.NativeStreamLogs = make(chan string)
 	go func() {
@@ -336,7 +336,7 @@ func (l Logger) OverrideNativeLogs() error {
 	return nil
 }
 
-func (l Logger) RevertNativeLogs() {
+func (l *Logger) RevertNativeLogs() {
 	l.WriterLogs.Close()
 	l.WriterErrors.Close()
 
