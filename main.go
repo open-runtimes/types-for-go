@@ -215,6 +215,7 @@ func NewLogger(status string, id string) (Logger, error) {
 		logger.Enabled = true
 	} else {
 		logger.Enabled = false
+		logger.Id = ""
 	}
 
 	if logger.Enabled {
