@@ -86,7 +86,7 @@ func (r Request) Body() interface{} {
 
 	if contentType == "application/json" {
 		if len(r.bodyBinary) == 0 {
-			return new(interface{})
+			return map[string]interface{}{}
 		}
 
 		bodyJson, err := r.BodyJson()
