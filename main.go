@@ -92,7 +92,7 @@ func (r Request) Body() interface{} {
 		bodyJson, err := r.BodyJson()
 
 		if err != nil {
-			return new(interface{})
+			return map[string]interface{}{}
 		}
 
 		return bodyJson
