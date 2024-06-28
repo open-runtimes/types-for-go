@@ -9,6 +9,7 @@ import (
 	"log"
 	"math/rand"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -38,8 +39,7 @@ func (c *Context) Error(message interface{}) {
 }
 
 type Request struct {
-	BodyRaw     string
-	Body        interface{}
+	_BodyBinary []byte
 	Headers     map[string]string
 	Method      string
 	Url         string
@@ -51,13 +51,74 @@ type Request struct {
 	Query       map[string]string
 }
 
+func (r Request) BodyBinary() []byte {
+	return r._BodyBinary
+}
+
+func (r Request) BodyText() string {
+	return string(r.BodyBinary())
+}
+
+func (r Request) BodyRaw() string {
+	return r.BodyText()
+}
+
+func (r Request) BodyJson() map[string]interface{} {
+	bodyBinary := r.BodyBinary()
+	if len(bodyBinary) != 0 {
+		var body map[string]interface{} = nil
+		err := json.Unmarshal(bodyBinary, &body)
+
+		if err != nil {
+			return map[string]interface{}{}
+		}
+
+		return body
+	} else {
+		return map[string]interface{}{}
+	}
+}
+
+func (r Request) Body() interface{} {
+	contentType := r.Headers["content-type"]
+
+	if contentType == "application/json" {
+		return r.BodyJson()
+	}
+
+	binaryTypes := []string{"application/", "audio/", "font/", "image/", "video/"}
+	for _, binaryType := range binaryTypes {
+		if strings.HasPrefix(contentType, binaryType) {
+			return r.BodyBinary()
+		}
+	}
+
+	return r.BodyText()
+}
+
 type ResponseOutput struct {
-	Body       string
+	Body       []byte
 	StatusCode int
 	Headers    map[string]string
 }
 
 type Response struct{}
+
+func (r Response) Binary(bytes []byte, statusCode int, headers map[string]string) ResponseOutput {
+	if headers == nil {
+		headers = map[string]string{}
+	}
+
+	if statusCode == 0 {
+		statusCode = 200
+	}
+
+	return ResponseOutput{
+		Body:       bytes,
+		StatusCode: statusCode,
+		Headers:    headers,
+	}
+}
 
 func (r Response) Send(body string, statusCode int, headers map[string]string) ResponseOutput {
 	if headers == nil {
@@ -68,11 +129,19 @@ func (r Response) Send(body string, statusCode int, headers map[string]string) R
 		statusCode = 200
 	}
 
-	return ResponseOutput{
-		Body:       body,
-		StatusCode: statusCode,
-		Headers:    headers,
+	return r.Text(body, statusCode, headers)
+}
+
+func (r Response) Text(body string, statusCode int, headers map[string]string) ResponseOutput {
+	if headers == nil {
+		headers = map[string]string{}
 	}
+
+	if statusCode == 0 {
+		statusCode = 200
+	}
+
+	return r.Binary([]byte(body), statusCode, headers)
 }
 
 func (r Response) Json(bodyStruct interface{}, statusCode int, headers map[string]string) ResponseOutput {
@@ -88,16 +157,16 @@ func (r Response) Json(bodyStruct interface{}, statusCode int, headers map[strin
 
 	jsonData, err := json.Marshal(bodyStruct)
 	if err != nil {
-		return r.Send("Error encoding JSON.", 500, nil)
+		return r.Text("Error encoding JSON.", 500, nil)
 	}
 
 	jsonString := string(jsonData[:])
 
-	return r.Send(jsonString, statusCode, headers)
+	return r.Text(jsonString, statusCode, headers)
 }
 
 func (r Response) Empty() ResponseOutput {
-	return r.Send("", 204, map[string]string{})
+	return r.Text("", 204, map[string]string{})
 }
 
 func (r Response) Redirect(url string, statusCode int, headers map[string]string) ResponseOutput {
@@ -111,7 +180,7 @@ func (r Response) Redirect(url string, statusCode int, headers map[string]string
 
 	headers["location"] = url
 
-	return r.Send("", statusCode, headers)
+	return r.Text("", statusCode, headers)
 }
 
 type Logger struct {
