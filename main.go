@@ -9,6 +9,7 @@ import (
 	"log"
 	"math/rand"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -223,7 +224,7 @@ func NewLogger(status string, id string) (Logger, error) {
 			logger.Id = "dev"
 		} else {
 			if id == "" {
-				logger.Id = logger._GenerateId()
+				logger.Id = logger.generateId(7)
 			} else {
 				logger.Id = id
 			}
@@ -346,11 +347,17 @@ func (l Logger) RevertNativeLogs() {
 	}
 }
 
-func (l Logger) _GenerateId() string {
-	timestamp := time.Now().UnixNano()
-	randomNumber := rand.Intn(1000)
+func (l Logger) generateId(padding int) string {
+	timestamp := time.Now().UnixNano() / 1000
 
-	// TODO: Improve logic, add padding
-	uniqueID := fmt.Sprintf("%d%d", timestamp, randomNumber)
-	return uniqueID
+	choices := []string{"0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "a", "b", "c", "d", "e", "f"}
+	hexString := strconv.FormatInt(timestamp, 16)
+
+	if padding > 0 {
+		for i := 0; i < padding; i++ {
+			hexString += choices[rand.Intn(len(choices))]
+		}
+	}
+
+	return hexString
 }
