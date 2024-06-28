@@ -88,7 +88,13 @@ func (r Request) Body() interface{} {
 	contentType := r.Headers["content-type"]
 
 	if contentType == "application/json" {
-		return r.BodyJson()
+		bodyJson, err := r.BodyJson()
+
+		if err != nil {
+			return new(interface{})
+		}
+
+		return bodyJson
 	}
 
 	binaryTypes := []string{"application/", "audio/", "font/", "image/", "video/"}
