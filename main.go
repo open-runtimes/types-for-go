@@ -68,19 +68,19 @@ func (r Request) BodyRaw() string {
 	return r.BodyText()
 }
 
-func (r Request) BodyJson() map[string]interface{} {
+func (r Request) BodyJson() (map[string]interface{}, error) {
 	bodyBinary := r.BodyBinary()
 	if len(bodyBinary) != 0 {
 		var body map[string]interface{} = nil
 		err := json.Unmarshal(bodyBinary, &body)
 
 		if err != nil {
-			return map[string]interface{}{}
+			return map[string]interface{}{}, errors.New("Could not parse body into a JSON.")
 		}
 
-		return body
+		return body, nil
 	} else {
-		return map[string]interface{}{}
+		return map[string]interface{}{}, nil
 	}
 }
 
