@@ -133,36 +133,16 @@ func (r Response) Binary(bytes []byte, statusCode int, headers map[string]string
 }
 
 func (r Response) Send(body string, statusCode int, headers map[string]string) ResponseOutput {
-	if headers == nil {
-		headers = map[string]string{}
-	}
-
-	if statusCode == 0 {
-		statusCode = 200
-	}
-
 	return r.Text(body, statusCode, headers)
 }
 
 func (r Response) Text(body string, statusCode int, headers map[string]string) ResponseOutput {
-	if headers == nil {
-		headers = map[string]string{}
-	}
-
-	if statusCode == 0 {
-		statusCode = 200
-	}
-
 	return r.Binary([]byte(body), statusCode, headers)
 }
 
 func (r Response) Json(bodyStruct interface{}, statusCode int, headers map[string]string) ResponseOutput {
 	if headers == nil {
 		headers = map[string]string{}
-	}
-
-	if statusCode == 0 {
-		statusCode = 200
 	}
 
 	headers["content-type"] = "application/json"
