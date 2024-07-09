@@ -32,11 +32,21 @@ func (l Log) String() string {
 }
 
 func (c *Context) Log(message interface{}) {
-	c.Logger.Write(message, LOGGER_TYPE_LOG, false)
+	switch v := message.(type) {
+	default:
+		c.Logger.Write(fmt.Sprintf("%#v", v)+"\n", LOGGER_TYPE_LOG, false)
+	case string:
+		c.Logger.Write(v+"\n", LOGGER_TYPE_LOG, false)
+	}
 }
 
 func (c *Context) Error(message interface{}) {
-	c.Logger.Write(message, LOGGER_TYPE_ERROR, false)
+	switch v := message.(type) {
+	default:
+		c.Logger.Write(fmt.Sprintf("%#v", v)+"\n", LOGGER_TYPE_ERROR, false)
+	case string:
+		c.Logger.Write(v+"\n", LOGGER_TYPE_ERROR, false)
+	}
 }
 
 type Request struct {
