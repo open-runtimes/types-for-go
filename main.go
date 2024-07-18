@@ -135,12 +135,9 @@ type Response struct {
 
 func (r Response) New() *Response {
 	r.enabledSetters = map[string]bool{
-		"Body":        false,
-		"Async":       false,
-		"Path":        false,
-		"Method":      false,
-		"Headers":     false,
-		"ScheduledAt": false,
+		"Body":       false,
+		"StatusCode": false,
+		"Headers":    false,
 	}
 	return &r
 }
@@ -172,11 +169,11 @@ func (r ContextResponse) Binary(bytes []byte, optionalSetters ...ResponseOption)
 	statusCode := 200
 	headers := map[string]string{}
 
-	if enabled, ok := options.enabledSetters["Headers"]; ok && enabled {
+	if options.enabledSetters["Headers"] {
 		headers = options.Headers
 	}
 
-	if enabled, ok := options.enabledSetters["StatusCode"]; ok && enabled {
+	if options.enabledSetters["StatusCode"] {
 		statusCode = options.StatusCode
 	}
 
@@ -202,7 +199,7 @@ func (r ContextResponse) Json(bodyStruct interface{}, optionalSetters ...Respons
 	}
 
 	headers := map[string]string{}
-	if enabled, ok := options.enabledSetters["Headers"]; ok && enabled {
+	if options.enabledSetters["Headers"] {
 		headers = options.Headers
 	}
 
@@ -231,7 +228,7 @@ func (r ContextResponse) Redirect(url string, optionalSetters ...ResponseOption)
 	}
 
 	headers := map[string]string{}
-	if enabled, ok := options.enabledSetters["Headers"]; ok && enabled {
+	if options.enabledSetters["Headers"] {
 		headers = options.Headers
 	}
 
