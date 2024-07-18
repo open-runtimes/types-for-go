@@ -1,4 +1,4 @@
-package types
+package openRuntimes
 
 import (
 	"bytes"
@@ -18,9 +18,16 @@ const LOGGER_TYPE_LOG = "log"
 const LOGGER_TYPE_ERROR = "error"
 
 type Context struct {
-	Logger Logger
-	Req    Request
-	Res    Response
+	logger Logger
+
+	Req ContextRequest
+	Res ContextResponse
+}
+
+func NewContext(logger Logger) Context {
+	return Context{
+		logger: logger,
+	}
 }
 
 type Log struct {
@@ -34,22 +41,22 @@ func (l Log) String() string {
 func (c *Context) Log(message interface{}) {
 	switch v := message.(type) {
 	default:
-		c.Logger.Write(fmt.Sprintf("%#v", v)+"\n", LOGGER_TYPE_LOG, false)
+		c.logger.Write(fmt.Sprintf("%#v", v)+"\n", LOGGER_TYPE_LOG, false)
 	case string:
-		c.Logger.Write(v+"\n", LOGGER_TYPE_LOG, false)
+		c.logger.Write(v+"\n", LOGGER_TYPE_LOG, false)
 	}
 }
 
 func (c *Context) Error(message interface{}) {
 	switch v := message.(type) {
 	default:
-		c.Logger.Write(fmt.Sprintf("%#v", v)+"\n", LOGGER_TYPE_ERROR, false)
+		c.logger.Write(fmt.Sprintf("%#v", v)+"\n", LOGGER_TYPE_ERROR, false)
 	case string:
-		c.Logger.Write(v+"\n", LOGGER_TYPE_ERROR, false)
+		c.logger.Write(v+"\n", LOGGER_TYPE_ERROR, false)
 	}
 }
 
-type Request struct {
+type ContextRequest struct {
 	bodyBinary  []byte
 	Headers     map[string]string
 	Method      string
@@ -62,36 +69,35 @@ type Request struct {
 	Query       map[string]string
 }
 
-func (r *Request) SetBodyBinary(bytes []byte) {
+func (r *ContextRequest) SetBodyBinary(bytes []byte) {
 	r.bodyBinary = bytes
 }
 
-func (r Request) BodyBinary() []byte {
+func (r ContextRequest) BodyBinary() []byte {
 	return r.bodyBinary
 }
 
-func (r Request) BodyText() string {
+func (r ContextRequest) BodyText() string {
 	return string(r.BodyBinary())
 }
 
-func (r Request) BodyRaw() string {
+func (r ContextRequest) BodyRaw() string {
 	return r.BodyText()
 }
 
-func (r Request) BodyJson() (map[string]interface{}, error) {
+func (r ContextRequest) BodyJson(v any) error {
 	bodyBinary := r.BodyBinary()
 
-	var body map[string]interface{} = nil
-	err := json.Unmarshal(bodyBinary, &body)
+	err := json.Unmarshal(bodyBinary, v)
 
 	if err != nil {
-		return map[string]interface{}{}, errors.New("could not parse body into a JSON")
+		return errors.New("could not parse body into a JSON")
 	}
 
-	return body, nil
+	return nil
 }
 
-func (r Request) Body() interface{} {
+func (r ContextRequest) Body() interface{} {
 	contentType := r.Headers["content-type"]
 
 	if contentType == "application/json" {
@@ -99,7 +105,8 @@ func (r Request) Body() interface{} {
 			return map[string]interface{}{}
 		}
 
-		bodyJson, err := r.BodyJson()
+		var bodyJson map[string]interface{}
+		err := r.BodyJson(&bodyJson)
 
 		if err != nil {
 			return map[string]interface{}{}
@@ -118,71 +125,110 @@ func (r Request) Body() interface{} {
 	return r.BodyText()
 }
 
-type ResponseOutput struct {
+type Response struct {
 	Body       []byte
 	StatusCode int
 	Headers    map[string]string
+
+	enabledSetters map[string]bool
 }
 
-type Response struct{}
+type ResponseOption func(*Response)
 
-func (r Response) Binary(bytes []byte, statusCode int, headers map[string]string) ResponseOutput {
-	if headers == nil {
-		headers = map[string]string{}
+type ContextResponse struct{}
+
+func (r ContextResponse) WithHeaders(headers map[string]string) ResponseOption {
+	return func(o *Response) {
+		o.Headers = headers
+		o.enabledSetters["Headers"] = true
+	}
+}
+
+func (r ContextResponse) WithStatusCode(statusCode int) ResponseOption {
+	return func(o *Response) {
+		o.StatusCode = statusCode
+		o.enabledSetters["StatusCode"] = true
+	}
+}
+
+func (r ContextResponse) Binary(bytes []byte, optionalSetters ...ResponseOption) Response {
+	options := Response{}
+	for _, opt := range optionalSetters {
+		opt(&options)
 	}
 
-	if statusCode == 0 {
-		statusCode = 200
+	statusCode := 200
+	headers := map[string]string{}
+
+	if enabled, ok := options.enabledSetters["Headers"]; ok && enabled {
+		headers = options.Headers
 	}
 
-	return ResponseOutput{
+	if enabled, ok := options.enabledSetters["StatusCode"]; ok && enabled {
+		statusCode = options.StatusCode
+	}
+
+	return Response{
 		Body:       bytes,
 		StatusCode: statusCode,
 		Headers:    headers,
 	}
 }
 
-func (r Response) Send(body string, statusCode int, headers map[string]string) ResponseOutput {
-	return r.Text(body, statusCode, headers)
+func (r ContextResponse) Send(body string, optionalSetters ...ResponseOption) Response {
+	return r.Text(body, optionalSetters...)
 }
 
-func (r Response) Text(body string, statusCode int, headers map[string]string) ResponseOutput {
-	return r.Binary([]byte(body), statusCode, headers)
+func (r ContextResponse) Text(body string, optionalSetters ...ResponseOption) Response {
+	return r.Binary([]byte(body), optionalSetters...)
 }
 
-func (r Response) Json(bodyStruct interface{}, statusCode int, headers map[string]string) ResponseOutput {
-	if headers == nil {
-		headers = map[string]string{}
+func (r ContextResponse) Json(bodyStruct interface{}, optionalSetters ...ResponseOption) Response {
+	options := Response{}
+	for _, opt := range optionalSetters {
+		opt(&options)
+	}
+
+	headers := map[string]string{}
+	if enabled, ok := options.enabledSetters["Headers"]; ok && enabled {
+		headers = options.Headers
 	}
 
 	headers["content-type"] = "application/json"
+	optionalSetters = append(optionalSetters, r.WithHeaders(headers))
 
 	jsonData, err := json.Marshal(bodyStruct)
 	if err != nil {
-		return r.Text("Error encoding JSON.", 500, nil)
+		optionalSetters = append(optionalSetters, r.WithStatusCode(500))
+		return r.Text("Error encoding JSON.", optionalSetters...)
 	}
 
 	jsonString := string(jsonData[:])
 
-	return r.Text(jsonString, statusCode, headers)
+	return r.Text(jsonString, optionalSetters...)
 }
 
-func (r Response) Empty() ResponseOutput {
-	return r.Text("", 204, map[string]string{})
+func (r ContextResponse) Empty() Response {
+	return r.Text("", r.WithStatusCode(204))
 }
 
-func (r Response) Redirect(url string, statusCode int, headers map[string]string) ResponseOutput {
-	if headers == nil {
-		headers = map[string]string{}
+func (r ContextResponse) Redirect(url string, optionalSetters ...ResponseOption) Response {
+	options := Response{}
+	for _, opt := range optionalSetters {
+		opt(&options)
 	}
 
-	if statusCode == 0 {
-		statusCode = 301
+	headers := map[string]string{}
+	if enabled, ok := options.enabledSetters["Headers"]; ok && enabled {
+		headers = options.Headers
 	}
 
 	headers["location"] = url
+	optionalSetters = append(optionalSetters, r.WithHeaders(headers))
 
-	return r.Text("", statusCode, headers)
+	optionalSetters = append([]ResponseOption{r.WithStatusCode(301)}, optionalSetters...)
+
+	return r.Text("", optionalSetters...)
 }
 
 type Logger struct {
