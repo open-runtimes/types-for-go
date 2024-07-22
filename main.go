@@ -1,4 +1,4 @@
-package openRuntimes
+package openruntimes
 
 import (
 	"bytes"
