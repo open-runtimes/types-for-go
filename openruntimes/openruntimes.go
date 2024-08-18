@@ -38,22 +38,14 @@ func (l Log) String() string {
 	return l.Message
 }
 
-func (c *Context) Log(message interface{}) {
-	switch v := message.(type) {
-	default:
-		c.logger.Write(fmt.Sprintf("%#v", v)+"\n", LOGGER_TYPE_LOG, false)
-	case string:
-		c.logger.Write(v+"\n", LOGGER_TYPE_LOG, false)
-	}
+func (c *Context) Log(messages ...interface{}) {
+	c.logger.Write(messages, LOGGER_TYPE_LOG, false)
+	c.logger.Write([]interface{}{"\n"}, LOGGER_TYPE_LOG, false)
 }
 
-func (c *Context) Error(message interface{}) {
-	switch v := message.(type) {
-	default:
-		c.logger.Write(fmt.Sprintf("%#v", v)+"\n", LOGGER_TYPE_ERROR, false)
-	case string:
-		c.logger.Write(v+"\n", LOGGER_TYPE_ERROR, false)
-	}
+func (c *Context) Error(messages ...interface{}) {
+	c.logger.Write(messages, LOGGER_TYPE_ERROR, false)
+	c.logger.Write([]interface{}{"\n"}, LOGGER_TYPE_ERROR, false)
 }
 
 type ContextRequest struct {
@@ -299,10 +291,10 @@ func NewLogger(status string, id string) (Logger, error) {
 	return logger, nil
 }
 
-func (l *Logger) Write(message interface{}, xtype string, xnative bool) {
+func (l *Logger) Write(messages []interface{}, xtype string, xnative bool) {
 	if xnative && !l.IncludesNativeInfo {
 		l.IncludesNativeInfo = true
-		l.Write("Native logs detected. Use context.Log() or context.Error() for better experience.", xtype, xnative)
+		l.Write([]interface{}{"Native logs detected. Use context.Log() or context.Error() for better experience."}, xtype, xnative)
 	}
 
 	stream := l.StreamLogs
@@ -313,20 +305,23 @@ func (l *Logger) Write(message interface{}, xtype string, xnative bool) {
 
 	stringLog := ""
 
-	switch message.(type) {
-	case string:
-		stringLog = message.(string)
-	case Log:
-		log := message.(Log)
-		stringLog = log.String()
-	default:
-		jsonData, err := json.Marshal(message)
-		if err != nil {
-			stringLog = fmt.Sprintf("%v", message)
-		} else {
-			jsonString := string(jsonData)
-			stringLog = jsonString
+	i := 0
+	for _, message := range messages {
+		switch message.(type) {
+		case string:
+			stringLog += message.(string)
+		case Log:
+			log := message.(Log)
+			stringLog += log.String()
+		default:
+			stringLog += fmt.Sprintf("%#v", message)
 		}
+
+		if i < len(messages)-1 {
+			stringLog += " "
+		}
+
+		i++
 	}
 
 	stream.Write([]byte(stringLog))
@@ -391,12 +386,12 @@ func (l *Logger) RevertNativeLogs() {
 
 	customLogs := <-l.NativeStreamLogs
 	if customLogs != "" {
-		l.Write(customLogs, LOGGER_TYPE_LOG, true)
+		l.Write([]interface{}{customLogs}, LOGGER_TYPE_LOG, true)
 	}
 
 	customErrors := <-l.NativeStreamErrors
 	if customErrors != "" {
-		l.Write(customLogs, LOGGER_TYPE_ERROR, true)
+		l.Write([]interface{}{customLogs}, LOGGER_TYPE_ERROR, true)
 	}
 }
 
