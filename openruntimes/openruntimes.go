@@ -10,7 +10,6 @@ import (
 	"math/rand"
 	"os"
 	"strconv"
-	"strings"
 	"time"
 )
 
@@ -105,13 +104,6 @@ func (r ContextRequest) Body() interface{} {
 		}
 
 		return bodyJson
-	}
-
-	binaryTypes := []string{"application/", "audio/", "font/", "image/", "video/"}
-	for _, binaryType := range binaryTypes {
-		if strings.HasPrefix(contentType, binaryType) {
-			return r.BodyBinary()
-		}
 	}
 
 	return r.BodyText()
