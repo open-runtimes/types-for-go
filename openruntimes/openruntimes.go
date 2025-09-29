@@ -316,7 +316,20 @@ func (l *Logger) Write(messages []interface{}, xtype string, xnative bool) {
 		i++
 	}
 
-	stream.Write([]byte(stringLog))
+	if len(stringLog) > 8000 {
+		stringLog = stringLog[:8000]
+		stringLog += "... Log truncated due to size limit (8000 characters)"
+	}
+
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				// Silently fail to prevent 500 errors in runtime
+				// Log write failures should not crash the runtime
+			}
+		}()
+		stream.Write([]byte(stringLog))
+	}()
 }
 
 func (l *Logger) End() {
