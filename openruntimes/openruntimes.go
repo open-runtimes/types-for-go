@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"math/rand"
+	"net/http"
 	"os"
 	"strconv"
 	"time"
@@ -48,7 +49,13 @@ func (c *Context) Error(messages ...interface{}) {
 }
 
 type ContextRequest struct {
-	bodyBinary  []byte
+	bodyBinary []byte
+
+	// Raw is the underlying *http.Request the runtime received. It is passed
+	// through as-is, so unlike Headers it still carries the x-open-runtimes-*
+	// control headers.
+	Raw *http.Request
+
 	Headers     map[string]string
 	Method      string
 	Url         string
