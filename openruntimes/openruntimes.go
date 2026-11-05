@@ -233,7 +233,7 @@ func (r ContextResponse) Redirect(url string, optionalSetters ...ResponseOption)
 	return r.Text("", optionalSetters...)
 }
 
-func (r ContextResponse) Stream(source iter.Seq2[[]byte, error], optionalSetters ...ResponseOption) Response {
+func (r ContextResponse) SendStream(source iter.Seq2[[]byte, error], optionalSetters ...ResponseOption) Response {
 	response := r.Binary([]byte{}, optionalSetters...)
 	response.Stream = source
 	return response
