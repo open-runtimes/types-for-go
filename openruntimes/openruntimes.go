@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"iter"
 	"log"
 	"math/rand"
 	"net/http"
@@ -118,6 +119,7 @@ func (r ContextRequest) Body() interface{} {
 
 type Response struct {
 	Body       []byte
+	Stream     iter.Seq2[[]byte, error]
 	StatusCode int
 	Headers    map[string]string
 
@@ -229,6 +231,12 @@ func (r ContextResponse) Redirect(url string, optionalSetters ...ResponseOption)
 	optionalSetters = append([]ResponseOption{r.WithStatusCode(301)}, optionalSetters...)
 
 	return r.Text("", optionalSetters...)
+}
+
+func (r ContextResponse) SendStream(source iter.Seq2[[]byte, error], optionalSetters ...ResponseOption) Response {
+	response := r.Binary([]byte{}, optionalSetters...)
+	response.Stream = source
+	return response
 }
 
 type Logger struct {
